@@ -20,7 +20,14 @@ import sys
 import urllib.parse
 from datetime import datetime
 
-PORT = int(os.environ.get("PORT", 8765))
+try:
+    import psycopg
+    from psycopg.types.json import Jsonb
+except ImportError:
+    psycopg = None
+    Jsonb = None
+
+PORT = 8765
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 SAMPLES_DIR = os.path.join(BASE_DIR, "samples")
@@ -65,6 +72,58 @@ def save_user_threads(threads):
     """Save user threads to user_threads.json"""
     with open(USER_THREADS_FILE, "w", encoding="utf-8") as f:
         json.dump(threads, f, ensure_ascii=False, indent=2)
+
+
+def init_likes_db():
+    """Create the single-user likes table when a PostgreSQL database is configured."""
+    if not DATABASE_URL or psycopg is None:
+        return
+    with psycopg.connect(DATABASE_URL) as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS liked_threads (
+                thread_id TEXT PRIMARY KEY,
+                thread_data JSONB NOT NULL,
+                liked_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        """)
+
+
+def get_liked_threads():
+    """Return all liked thread snapshots, newest first."""
+    if not DATABASE_URL or psycopg is None:
+        raise RuntimeError("DATABASE_URL 또는 psycopg가 설정되지 않았습니다.")
+    with psycopg.connect(DATABASE_URL) as conn:
+        rows = conn.execute(
+            "SELECT thread_data FROM liked_threads ORDER BY liked_at DESC"
+        ).fetchall()
+    return [row[0] for row in rows]
+
+
+def upsert_liked_thread(thread):
+    """Store/update one liked thread snapshot."""
+    if not DATABASE_URL or psycopg is None:
+        raise RuntimeError("DATABASE_URL 또는 psycopg가 설정되지 않았습니다.")
+    thread_id = str(thread.get("thread_id", "")).strip()
+    if not thread_id:
+        raise ValueError("thread_id가 필요합니다.")
+    with psycopg.connect(DATABASE_URL) as conn:
+        conn.execute(
+            """
+            INSERT INTO liked_threads (thread_id, thread_data, liked_at)
+            VALUES (%s, %s, NOW())
+            ON CONFLICT (thread_id)
+            DO UPDATE SET thread_data = EXCLUDED.thread_data, liked_at = NOW()
+            """,
+            (thread_id, Jsonb(thread))
+        )
+
+
+def delete_liked_thread(thread_id):
+    """Remove one liked thread."""
+    if not DATABASE_URL or psycopg is None:
+        raise RuntimeError("DATABASE_URL 또는 psycopg가 설정되지 않았습니다.")
+    with psycopg.connect(DATABASE_URL) as conn:
+        conn.execute("DELETE FROM liked_threads WHERE thread_id = %s", (thread_id,))
 
 
 def get_main_category(thread, cat_mapping):
@@ -548,7 +607,7 @@ def synthesize_infinite_thread(topic_idx: int):
     persona_key = personas_keys[(topic_idx + 1) % len(personas_keys)]
     persona = PERSONA_PROFILES[persona_key]
 
-    thread_id = f"th_inf_{topic_idx}_{int(datetime.now().timestamp())}"
+    thread_id = f"th_inf_{topic_idx}"
     likes = random.randint(840, 4800)
 
     return {
@@ -653,6 +712,13 @@ class ThreadsCloneHandler(http.server.SimpleHTTPRequestHandler):
             })
             return
 
+        elif path == "/api/likes":
+            try:
+                self.send_json_response({"threads": get_liked_threads()})
+            except Exception as e:
+                self.send_json_response({"success": False, "error": str(e)}, status=503)
+            return
+
         elif path == "/api/categories":
             cat_data = load_categories()
             self.send_json_response(cat_data)
@@ -686,6 +752,29 @@ class ThreadsCloneHandler(http.server.SimpleHTTPRequestHandler):
 
         content_length = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(content_length) if content_length > 0 else b""
+
+        # ── Single-user server-side likes ──
+        if path == "/api/likes":
+            try:
+                data = json.loads(body.decode("utf-8")) if body else {}
+                action = data.get("action", "")
+                if action == "like":
+                    thread = data.get("thread")
+                    if not isinstance(thread, dict):
+                        raise ValueError("thread 객체가 필요합니다.")
+                    upsert_liked_thread(thread)
+                    self.send_json_response({"success": True})
+                elif action == "unlike":
+                    thread_id = str(data.get("thread_id", "")).strip()
+                    if not thread_id:
+                        raise ValueError("thread_id가 필요합니다.")
+                    delete_liked_thread(thread_id)
+                    self.send_json_response({"success": True})
+                else:
+                    raise ValueError("action은 like 또는 unlike여야 합니다.")
+            except Exception as e:
+                self.send_json_response({"success": False, "error": str(e)}, status=503)
+            return
 
         # ── 1. TXT/CSV 스레드 파일 업로드 및 자동 카테고리 추가 ──
         if path == "/api/upload-thread":
@@ -769,6 +858,13 @@ class ThreadsCloneHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_json_response({"success": False, "error": str(e)}, status=400)
 
         # ── 2. 소분류 관리 (추가/삭제) ──
+        elif path == "/api/likes":
+            try:
+                self.send_json_response({"threads": get_liked_threads()})
+            except Exception as e:
+                self.send_json_response({"success": False, "error": str(e)}, status=503)
+            return
+
         elif path == "/api/categories":
             try:
                 data = json.loads(body.decode("utf-8"))
@@ -886,6 +982,15 @@ class ReusableThreadingServer(socketserver.ThreadingMixIn, http.server.HTTPServe
 
 
 def main():
+    if DATABASE_URL:
+        try:
+            init_likes_db()
+            print("💾 PostgreSQL 좋아요 저장소 연결 완료")
+        except Exception as e:
+            print(f"⚠️ PostgreSQL 좋아요 저장소 초기화 실패: {e}")
+    else:
+        print("ℹ️ DATABASE_URL이 없어 서버 좋아요 저장소가 비활성화되어 있습니다.")
+
     port = PORT
     if len(sys.argv) > 1:
         try:

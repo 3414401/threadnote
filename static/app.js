@@ -16,6 +16,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let feedThreads = [];
   let savedThreadIds = new Set();
   let likedThreadIds = new Set();
+  let likedThreads = new Map();
   let currentPage = 1;
   let isFetchingMore = false;
   let hasMoreThreads = true;
@@ -24,7 +25,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Local Storage Keys
   const STORAGE_SAVED = "threads_saved_ids";
-  const STORAGE_LIKES = "threads_liked_ids";
   const STORAGE_THEME = "threads_theme";
   const STORAGE_PERSONA = "threads_active_persona";
 
@@ -135,6 +135,7 @@ document.addEventListener("DOMContentLoaded", () => {
   async function init() {
     console.log("[ThreadNote] Starting initialization...");
     try { loadStoredPreferences(); } catch(e) { console.error("[Init] loadStoredPreferences failed:", e); }
+    try { await loadServerLikes(); } catch(e) { console.error("[Init] loadServerLikes failed:", e); }
     try { await setupCategoryNav(); } catch(e) { console.error("[Init] setupCategoryNav failed:", e); }
     try { setupNavigation(); } catch(e) { console.error("[Init] setupNavigation failed:", e); }
     try { setupUploadThread(); } catch(e) { console.error("[Init] setupUploadThread failed:", e); }
@@ -154,12 +155,21 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const saved = localStorage.getItem(STORAGE_SAVED);
       if (saved) savedThreadIds = new Set(JSON.parse(saved));
-      const likes = localStorage.getItem(STORAGE_LIKES);
-      if (likes) likedThreadIds = new Set(JSON.parse(likes));
       const persona = localStorage.getItem(STORAGE_PERSONA);
       if (persona) currentPersona = persona;
     } catch (e) { console.warn(e); }
     updatePersonaUI();
+  }
+
+  async function loadServerLikes() {
+    const res = await fetch("/api/likes", { cache: "no-store" });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "좋아요 목록을 불러오지 못했습니다.");
+    }
+    const data = await res.json();
+    likedThreadIds = new Set((data.threads || []).map(t => t.thread_id));
+    likedThreads = new Map((data.threads || []).map(t => [t.thread_id, t]));
   }
 
   function setTheme(theme) {
@@ -711,24 +721,54 @@ document.addEventListener("DOMContentLoaded", () => {
       insightBtn.querySelector("span").textContent = isHidden ? "💡 지도서 원문 & 출제 포인트 엿보기" : "▲ 지도서 원문 접기";
     });
 
-    // 3. Like
+    // 3. Like - server is the source of truth so all devices share one list
     const likeBtn = card.querySelector('[data-action="like"]');
     const likeNum = card.querySelector('.like-num');
-    likeBtn?.addEventListener("click", () => {
+    likeBtn?.addEventListener("click", async () => {
       const isLiked = likedThreadIds.has(thread.thread_id);
-      if (isLiked) {
-        likedThreadIds.delete(thread.thread_id);
-        likeBtn.classList.remove("liked");
-        likeBtn.querySelector("svg").setAttribute("fill", "none");
-        thread.metrics.likes--;
-      } else {
-        likedThreadIds.add(thread.thread_id);
-        likeBtn.classList.add("liked");
-        likeBtn.querySelector("svg").setAttribute("fill", "currentColor");
-        thread.metrics.likes++;
+      const previousLikes = thread.metrics.likes;
+
+      likeBtn.disabled = true;
+      try {
+        if (isLiked) {
+          const res = await fetch("/api/likes", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "unlike", thread_id: thread.thread_id })
+          });
+          if (!res.ok) throw new Error("좋아요 해제 저장 실패");
+          likedThreadIds.delete(thread.thread_id);
+          likedThreads.delete(thread.thread_id);
+          likeBtn.classList.remove("liked");
+          likeBtn.querySelector("svg").setAttribute("fill", "none");
+          thread.metrics.likes = Math.max(0, thread.metrics.likes - 1);
+        } else {
+          const likedSnapshot = JSON.parse(JSON.stringify(thread));
+          likedSnapshot.metrics = {
+            ...(likedSnapshot.metrics || {}),
+            likes: (likedSnapshot.metrics?.likes || 0) + 1
+          };
+          const res = await fetch("/api/likes", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "like", thread: likedSnapshot })
+          });
+          if (!res.ok) throw new Error("좋아요 저장 실패");
+          likedThreadIds.add(thread.thread_id);
+          likedThreads.set(thread.thread_id, likedSnapshot);
+          likeBtn.classList.add("liked");
+          likeBtn.querySelector("svg").setAttribute("fill", "currentColor");
+          thread.metrics.likes++;
+        }
+        likeNum.textContent = thread.metrics.likes.toLocaleString();
+        if (currentNavTab === "activity") renderActivity("likes");
+      } catch (e) {
+        thread.metrics.likes = previousLikes;
+        console.error("[Like] server sync failed:", e);
+        showToast("좋아요 저장에 실패했습니다. 잠시 후 다시 시도해주세요.");
+      } finally {
+        likeBtn.disabled = false;
       }
-      likeNum.textContent = thread.metrics.likes.toLocaleString();
-      localStorage.setItem(STORAGE_LIKES, JSON.stringify(Array.from(likedThreadIds)));
     });
 
     // 4. Repost
@@ -1113,7 +1153,7 @@ document.addEventListener("DOMContentLoaded", () => {
     activityStream.innerHTML = "";
     const list = type === "saved"
       ? feedThreads.filter(t => savedThreadIds.has(t.thread_id))
-      : feedThreads.filter(t => likedThreadIds.has(t.thread_id));
+      : Array.from(likedThreads.values());
 
     if (list.length === 0) {
       activityEmptyNotice.classList.remove("hidden");
