@@ -20,7 +20,7 @@ import sys
 import urllib.parse
 from datetime import datetime
 
-PORT = 8765
+PORT = int(os.environ.get("PORT", 8765))
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 SAMPLES_DIR = os.path.join(BASE_DIR, "samples")
