@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Threads</title>
+  <link rel="stylesheet" href="style.css?v=5" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body class="dark-theme">
+  
+  <div class="threads-shell">
+    
+    <!-- Top Bar -->
+    <header class="threads-top-bar">
+      <div class="top-bar-left">
+        <button class="top-icon-btn" id="themeToggleBtn" title="테마 변경">
+          <svg class="sun-icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Center Threads Logo -->
+      <div class="threads-center-logo" id="homeLogoBtn">
+        <svg viewBox="0 0 192 192" width="34" height="34" class="threads-svg">
+          <path fill="currentColor" d="M141.537 88.9883C140.71 88.5919 139.87 88.2104 139.019 87.8451C137.537 60.5382 122.616 44.905 97.5619 44.745C97.4484 44.7443 97.3355 44.7443 97.222 44.7443C82.2364 44.7443 69.7731 51.1409 62.102 62.7807L75.481 72.0993C81.0425 63.6593 89.4795 60.5986 97.2343 60.5986C97.3075 60.5986 97.3813 60.5991 97.4552 60.6C112.593 60.7118 121.724 71.8624 122.955 89.2897C115.187 86.8523 106.666 85.5901 97.5606 85.5901C66.8625 85.5901 47.939 101.996 47.939 124.978C47.939 146.467 64.9126 161.42 86.8584 161.42C106.331 161.42 120.301 151.782 127.319 135.031C134.793 145.452 145.385 151.272 159.278 151.272C167.973 151.272 174.453 148.243 178.508 142.237C182.594 136.185 183.993 127.426 182.68 116.321C180.708 99.6457 167.316 89.4891 141.537 88.9883ZM97.5606 145.578C80.2014 145.578 69.1911 135.632 69.1911 120.957C69.1911 106.281 80.2014 96.3359 97.5606 96.3359C104.919 96.3359 111.954 97.3592 118.423 99.3621C116.297 125.795 107.643 145.578 97.5606 145.578Z"/>
+        </svg>
+      </div>
+
+      <div class="top-bar-right">
+      </div>
+    </header>
+
+    <!-- ★ 2단 카테고리 네비게이션 ★ -->
+    <div class="cat-nav-wrapper">
+      <!-- 1단: 대분류 탭 (JS가 동적 렌더링) -->
+      <div class="main-cat-bar" id="mainCatBar"></div>
+      <!-- 2단: 소분류 칩 행 (선택된 대분류에 따라 슬라이드) -->
+      <div class="sub-cat-bar" id="subCatBar" style="display:none;"></div>
+    </div>
+
+    <!-- MAIN TIMELINE VIEW -->
+    <main class="timeline-container" id="timelineView">
+      <div class="feed-welcome-header" id="feedWelcomeHeader">
+        <div class="feed-welcome-text">
+          <span class="feed-welcome-emoji">⭐</span>
+          <div>
+            <strong id="feedWelcomeTitle">추천 피드</strong>
+            <p id="feedWelcomeDesc">모든 과목에서 랜덤으로 선별된 핵심 지식 스레드</p>
+          </div>
+        </div>
+      </div>
+
+
+      <!-- Feed Stream -->
+      <div class="threads-feed-stream" id="threadsFeedStream">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <!-- Infinite Scroll Sentinel & Spinner -->
+      <div id="infiniteScrollSentinel" class="infinite-scroll-box">
+        <div class="threads-spinner" id="infiniteSpinner"></div>
+        <span class="infinite-hint-text">스크롤을 내리면 새로운 지식 썰이 계속 등장합니다...</span>
+      </div>
+
+      <!-- Empty State -->
+      <div id="feedEmptyNotice" class="empty-notice hidden">
+        <div class="empty-threads-logo">🧵</div>
+        <h3>피드를 불러오는 중입니다</h3>
+        <p>잠시만 기다려주세요.</p>
+      </div>
+
+
+    </main>
+
+    <!-- SEARCH VIEW (Search Tab) -->
+    <section class="timeline-container hidden" id="searchView">
+      <div class="search-header-box">
+        <div class="search-input-wrap">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="searchInput" placeholder="단원, 성취기준, 오개념, 키워드 검색..." />
+        </div>
+      </div>
+
+      <div class="search-topics-section">
+        <h4>추천 검색 키워드</h4>
+        <div class="search-chips">
+          <button class="search-chip" data-query="삼각형">#삼각형</button>
+          <button class="search-chip" data-query="맨홀">#맨홀뚜껑</button>
+          <button class="search-chip" data-query="직각">#종이접기직각</button>
+          <button class="search-chip" data-query="사다리꼴">#사다리꼴오개념</button>
+          <button class="search-chip" data-query="밑면">#직육면체밑면</button>
+          <button class="search-chip" data-query="분수">#분수덧셈오류</button>
+          <button class="search-chip" data-query="선분">#선분용어금지</button>
+        </div>
+      </div>
+
+      <div class="search-results-list" id="searchResultsStream"></div>
+    </section>
+
+    <!-- ACTIVITY / SAVED VIEW (Heart Tab) -->
+    <section class="timeline-container hidden" id="activityView">
+      <div class="activity-header">
+        <h2>활동 및 북마크</h2>
+        <div class="activity-sub-tabs">
+          <button class="act-tab active" data-act-tab="saved">📌 저장된 스레드</button>
+          <button class="act-tab" data-act-tab="likes">❤️ 좋아요한 글</button>
+        </div>
+      </div>
+      <div class="activity-stream" id="activityStream"></div>
+      <div id="activityEmptyNotice" class="empty-notice hidden">
+        <div class="empty-threads-logo">📌</div>
+        <h3>저장된 스레드가 없습니다</h3>
+        <p>마음에 드는 스레드 우측 상단 북마크 아이콘을 눌러보세요.</p>
+      </div>
+    </section>
+
+    <!-- PROFILE VIEW (Profile Tab) -->
+    <section class="timeline-container hidden" id="profileView">
+      <div class="profile-header-card">
+        <div class="profile-top-info">
+          <div class="profile-titles">
+            <h2 id="profileDisplayName">초등 3년차 김교사</h2>
+            <div class="profile-handle-row">
+              <span class="profile-handle" id="profileHandle">@elementary_kim</span>
+              <span class="threads-net-badge">threads.net</span>
+            </div>
+          </div>
+          <div class="profile-avatar-large" id="profileLargeAvatar">👩‍🏫</div>
+        </div>
+
+        <p class="profile-bio" id="profileBio">
+          오늘도 2학년 교실에서 애들이랑 뒹굴다 멘탈 털린 초등교사의 생생한 수업 썰과 지도 꿀팁 🍎
+        </p>
+
+        <div class="profile-stats">
+          <span class="profile-followers-count" id="profileFollowers">12.4K</span> 팔로워
+        </div>
+
+        <div class="profile-action-btns" style="display: flex; flex-wrap: wrap; gap: 8px;">
+          <button class="profile-pill-btn" id="openSettingsBtn">⚙️ 카테고리 관리 / 설정</button>
+          <button class="profile-pill-btn" id="openUploadThreadBtn">📤 스레드 업로드 (TXT/CSV)</button>
+          <button class="profile-pill-btn" id="exportThreadsBtn">📥 스레드 백업 (CSV 다운)</button>
+          <button class="profile-pill-btn" id="switchPersonaBtn">👤 화자 페르소나 변경</button>
+        </div>
+      </div>
+
+      <div class="profile-feed-title">
+        <span>내가 작성한 스레드 타래</span>
+      </div>
+      <div class="profile-feed-stream" id="profileFeedStream"></div>
+    </section>
+
+    <!-- BOTTOM STICKY NAVIGATION BAR (Threads 5 Iconic Icons) -->
+    <nav class="threads-bottom-nav">
+      <!-- 1. Home -->
+      <button class="bnav-btn active" data-bnav="home" title="홈 피드">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor">
+          <path d="M3 10.182V20a2 2 0 0 0 2 2h4.5a1 1 0 0 0 1-1v-4.5a1.5 1.5 0 0 1 1.5-1.5h0a1.5 1.5 0 0 1 1.5 1.5V21a1 1 0 0 0 1 1H19a2 2 0 0 0 2-2v-9.818a2 2 0 0 0-.67-1.493l-7-6.222a2 2 0 0 0-2.66 0l-7 6.222A2 2 0 0 0 3 10.182z"></path>
+        </svg>
+      </button>
+
+      <!-- 2. Search -->
+      <button class="bnav-btn" data-bnav="search" title="검색">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.3">
+          <circle cx="11" cy="11" r="7.5"></circle>
+          <line x1="21" y1="21" x2="16.5" y2="16.5"></line>
+        </svg>
+      </button>
+
+      <!-- 3. Compose (New Thread / Upload PDF) -->
+      <button class="bnav-btn compose-trigger" data-bnav="compose" id="bottomComposeBtn" title="새 스레드 작성">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.3">
+          <path d="M12 20h9"></path>
+          <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+        </svg>
+      </button>
+
+      <!-- 4. Activity (Heart) -->
+      <button class="bnav-btn" data-bnav="activity" title="저장 및 활동">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.3">
+          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+        </svg>
+        <span class="nav-unread-dot hidden" id="navUnreadDot"></span>
+      </button>
+
+      <!-- 5. Profile -->
+      <button class="bnav-btn" data-bnav="profile" title="프로필">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.3">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+          <circle cx="12" cy="7" r="4"></circle>
+        </svg>
+      </button>
+    </nav>
+
+  </div>
+
+  <!-- THREADS COMPOSE MODAL (New Thread / PDF Upload Drawer) -->
+  <div class="threads-modal-backdrop hidden" id="composeModal">
+    <div class="compose-modal-card">
+      <div class="compose-modal-top">
+        <button class="modal-cancel-btn" id="closeComposeModalBtn">취소</button>
+        <span class="compose-modal-title">새로운 스레드</span>
+        <button class="modal-post-btn" id="submitComposeBtn" disabled>게시</button>
+      </div>
+
+      <div class="compose-author-row">
+        <div class="compose-avatar" id="modalAuthorAvatar">👩‍🏫</div>
+        <div class="compose-author-details">
+          <span class="compose-name" id="modalAuthorName">초등 3년차 김교사</span>
+          <div class="persona-switch-badge" id="openPersonaPicker">
+            <span id="currentPersonaLabel">👩‍🏫 초등 3년차 김교사</span>
+            <span class="arrow-down">▼</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="compose-thread-flow">
+        <div class="compose-line-connector"></div>
+        <div class="compose-text-wrap">
+          <textarea id="composeTextArea" placeholder="스레드를 시작하세요... 또는 PDF 문서를 첨부하세요." rows="4"></textarea>
+        </div>
+      </div>
+
+      <!-- Attached PDF Badge -->
+      <div id="composePdfBadge" class="attached-pdf-badge hidden">
+        <div class="pdf-icon-wrap">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+          </svg>
+        </div>
+        <div class="pdf-badge-meta">
+          <span class="pdf-file-title" id="pdfFileName">수학 교육과정 나올각.pdf</span>
+          <span class="pdf-file-size" id="pdfFileSize">67페이지 • 교육과정 지도서</span>
+        </div>
+        <button class="remove-pdf-btn" id="removePdfBtn">&times;</button>
+      </div>
+
+      <!-- Attachments Bar -->
+      <div class="compose-attachments-bar">
+        <div class="attach-icons-left">
+          <input type="file" id="modalFileInput" accept=".pdf,.txt,.md" style="display:none;" />
+          <button class="attach-action-btn" id="modalAttachBtn" title="PDF 파일 업로드">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+            </svg>
+            <span>PDF 첨부</span>
+          </button>
+          <button class="attach-action-btn" id="quickMathSampleBtn" title="초등수학 각론 샘플 불러오기">
+            <span>⚡ 지도서 샘플</span>
+          </button>
+        </div>
+        <div class="compose-status-hint">
+          누구나 답글을 남길 수 있습니다
+        </div>
+      </div>
+
+      <!-- Persona Dropdown -->
+      <div id="personaPickerDropdown" class="persona-picker-popover hidden">
+        <div class="popover-title">스레드 화자 선택</div>
+        <div class="persona-option-item selected" data-persona="elementary_teacher">
+          <span class="popover-avatar">👩‍🏫</span>
+          <div class="popover-info">
+            <strong>초등 3년차 김교사</strong>
+            <small>교실 현실 썰, 수업 멘붕기</small>
+          </div>
+          <span class="chk">✓</span>
+        </div>
+        <div class="persona-option-item" data-persona="pass_candidate">
+          <span class="popover-avatar">📚</span>
+          <div class="popover-info">
+            <strong>임용 수석합격생 박선배</strong>
+            <small>출제위원 함정 포인트 팩폭</small>
+          </div>
+          <span class="chk">✓</span>
+        </div>
+        <div class="persona-option-item" data-persona="extreme_t_math">
+          <span class="popover-avatar">⚡</span>
+          <div class="popover-info">
+            <strong>극T 수학교육 분석관</strong>
+            <small>감정 빼고 수학적 공준과 지도 원리</small>
+          </div>
+          <span class="chk">✓</span>
+        </div>
+        <div class="persona-option-item" data-persona="student_minsoo">
+          <span class="popover-avatar">🎒</span>
+          <div class="popover-info">
+            <strong>2학년 3반 김민수</strong>
+            <small>수학시간에 억울한 초딩 시점</small>
+          </div>
+          <span class="chk">✓</span>
+        </div>
+        <div class="persona-option-item" data-persona="cat_teacher">
+          <span class="popover-avatar">🐱</span>
+          <div class="popover-info">
+            <strong>냥집사 수학쌤</strong>
+            <small>고양이 상자 굴리다 깨달은 밑면의 법칙</small>
+          </div>
+          <span class="chk">✓</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SETTINGS MODAL -->
+  <div class="threads-modal-backdrop hidden" id="settingsModal">
+    <div class="compose-modal-card settings-card">
+      <div class="compose-modal-top">
+        <span class="compose-modal-title">⚙️ 설정</span>
+        <button class="modal-cancel-btn" id="closeSettingsModalBtn">완료</button>
+      </div>
+      <div class="settings-content">
+        <!-- 소분류 관리 -->
+        <div class="setting-section-title">📂 소분류 관리</div>
+        <div class="setting-row sub-mgr-row">
+          <div class="sub-mgr-controls">
+            <select id="subMgrMainSelect" class="sub-mgr-select">
+              <option value="">대분류 선택...</option>
+            </select>
+            <input type="text" id="subMgrNewName" placeholder="새 소분류 이름" class="sub-mgr-input" />
+            <button class="sub-mgr-add-btn" id="subMgrAddBtn">추가</button>
+          </div>
+          <div class="sub-mgr-chips-wrap" id="subMgrChipsWrap">
+            <span class="sub-mgr-hint">대분류를 선택하면 소분류 목록이 표시됩니다</span>
+          </div>
+        </div>
+
+        <div class="setting-divider"></div>
+
+        <div class="setting-row">
+          <div>
+            <strong>내장 오프라인 엔진</strong>
+            <p>현재 상태: 초등 임용 각론 스레드 피드 정상 작동 중</p>
+          </div>
+          <span class="status-indicator-badge">정상 작동 중</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- THREAD FILE UPLOAD MODAL -->
+  <div class="threads-modal-backdrop hidden" id="uploadThreadModal">
+    <div class="compose-modal-card settings-card">
+      <div class="compose-modal-top">
+        <span class="compose-modal-title">📤 스레드 파일 추가</span>
+        <button class="modal-cancel-btn" id="closeUploadThreadModalBtn">취소</button>
+      </div>
+      <div class="settings-content">
+        <div class="upload-thread-desc">
+          <p>TXT 또는 CSV 파일을 업로드하면 서버에 영구 저장되어 피드에 추가 및 수정됩니다.<br>
+          아래 양식에 맞게 작성된 <strong>.txt</strong> 혹은 다운로드한 <strong>.csv</strong> 파일을 선택해주세요.<br>
+          (※ CSV 업로드 시, 새로운 카테고리를 입력하면 자동으로 생성됩니다!)</p>
+        </div>
+
+        <div class="upload-thread-format-box">
+          <div class="format-title">📋 양식 미리보기</div>
+          <pre class="format-code">===THREAD===
+대분류: 수학
+소분류: 도형
+글쓴이: 홍길동 선생님
+아바타: 👨‍🏫
+태그: #2022개정 #도형
+
+[훅]
+교실 상황 썰 내용 (Post 1)
+
+[핵심]
+2022 vs 2015 차이 + 이론 (Post 2)
+
+[실천]
+발문 + 성취기준 번호 (Post 3)
+
+[댓글]
+👍 박선배: 댓글 내용
+===END===</pre>
+          <p class="format-note">💡 하나의 파일에 여러 스레드를 담을 수 있습니다 (===THREAD=== 반복)</p>
+        </div>
+
+        <div class="upload-thread-drop-area" id="uploadThreadDropArea">
+          <input type="file" id="uploadThreadFileInput" accept=".txt,.csv" style="display:none;" />
+          <div class="upload-drop-icon">📄</div>
+          <p>여기를 클릭하거나 파일을 드래그하세요</p>
+          <span id="uploadThreadFileName" class="upload-file-name"></span>
+        </div>
+
+        <div id="uploadThreadProgress" class="upload-thread-progress hidden">
+          <div class="progress-bar-bg"><div class="progress-bar-fill" id="uploadThreadProgressFill"></div></div>
+          <span id="uploadThreadProgressText">파일 분석 중...</span>
+        </div>
+
+        <button class="upload-thread-submit-btn" id="uploadThreadSubmitBtn" disabled>
+          피드에 추가하기
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST MESSAGE -->
+  <div id="threadsToast" class="threads-toast hidden">
+    <span id="threadsToastText">클립보드에 복사되었습니다.</span>
+  </div>
+
+  <script src="app.js?v=5"></script>
+</body>
+</html>
