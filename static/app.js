@@ -726,6 +726,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const likeNum = card.querySelector('.like-num');
     likeBtn?.addEventListener("click", async () => {
       const isLiked = likedThreadIds.has(thread.thread_id);
+      thread.metrics = thread.metrics || { likes: 0, replies: 0, reposts: 0 };
       const previousLikes = thread.metrics.likes;
 
       likeBtn.disabled = true;
