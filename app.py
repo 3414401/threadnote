@@ -27,13 +27,14 @@ except ImportError:
     psycopg = None
     Jsonb = None
 
-PORT = 8765
+PORT = int(os.environ.get("PORT", 8765))
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 SAMPLES_DIR = os.path.join(BASE_DIR, "samples")
 UPLOADS_DIR = os.path.join(BASE_DIR, "uploads")
 CATEGORIES_FILE = os.path.join(UPLOADS_DIR, "categories.json")
 USER_THREADS_FILE = os.path.join(UPLOADS_DIR, "user_threads.json")
+DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 
 os.makedirs(UPLOADS_DIR, exist_ok=True)
 
